@@ -11,6 +11,7 @@ export interface VideoGenerationInput {
   songUrl: string;
   character: CharacterInput;
   visualDirection: string;
+  locations: string[];
   quality: VideoQuality;
 }
 
@@ -47,11 +48,14 @@ class MockVideoProvider implements VideoProvider {
           ? `personnage décrit : "${input.character.description}"`
           : "aucun personnage fourni";
 
+    const locationsNote = input.locations.length > 0 ? input.locations.join(", ") : "aucun lieu précisé";
+
     return {
       status: "completed",
       message:
         `Aperçu simulé (fournisseur "mock") : chanson "${input.songName}" reçue (stockée sur Vercel Blob), ${characterNote}, ` +
-        `direction visuelle : "${input.visualDirection || "aucune"}", qualité demandée : ${QUALITY_LABELS[input.quality]}. ` +
+        `direction visuelle : "${input.visualDirection || "aucune"}", lieux : ${locationsNote}, ` +
+        `qualité demandée : ${QUALITY_LABELS[input.quality]}. ` +
         `Aucune vidéo réelle n'a été générée — connectez un vrai fournisseur (variable d'env VIDEO_PROVIDER) pour produire un vrai clip.`,
     };
   }

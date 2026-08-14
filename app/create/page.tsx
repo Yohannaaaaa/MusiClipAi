@@ -13,6 +13,17 @@ const QUALITY_OPTIONS: { value: VideoQuality; label: string; hint: string }[] = 
   { value: "8k", label: "8K", hint: "4320p" },
 ];
 
+const LOCATION_OPTIONS = [
+  "Plage",
+  "Ville la nuit",
+  "Rooftop",
+  "Studio",
+  "Nature",
+  "Rue",
+  "Club / fête",
+  "Intérieur cosy",
+];
+
 type GenerateResponse = {
   status?: "completed" | "failed";
   videoUrl?: string;
@@ -28,6 +39,8 @@ export default function CreatePage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [characterDescription, setCharacterDescription] = useState("");
   const [visualDirection, setVisualDirection] = useState("");
+  const [locations, setLocations] = useState<string[]>([]);
+  const [customLocation, setCustomLocation] = useState("");
   const [quality, setQuality] = useState<VideoQuality>("normal");
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
@@ -58,6 +71,12 @@ export default function CreatePage() {
         );
       }
 
+      const customLocations = customLocation
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const allLocations = [...new Set([...locations, ...customLocations])];
+
       setPhase("generating");
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -70,6 +89,7 @@ export default function CreatePage() {
           characterDescription,
           photoUrls,
           visualDirection,
+          locations: allLocations,
           quality,
         }),
       });
@@ -84,6 +104,12 @@ export default function CreatePage() {
   }
 
   const isSubmitting = phase !== "idle";
+
+  function toggleLocation(location: string) {
+    setLocations((current) =>
+      current.includes(location) ? current.filter((entry) => entry !== location) : [...current, location],
+    );
+  }
 
   return (
     <div className="flex flex-1 justify-center bg-black">
@@ -236,6 +262,39 @@ export default function CreatePage() {
                 ⊕
               </span>
             </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span aria-hidden className="text-fuchsia-500">
+                📍
+              </span>
+              <h2 className="text-sm font-medium text-white">Lieux du clip</h2>
+              <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">Optionnel</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {LOCATION_OPTIONS.map((location) => (
+                <button
+                  key={location}
+                  type="button"
+                  onClick={() => toggleLocation(location)}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    locations.includes(location)
+                      ? "border-fuchsia-500 bg-fuchsia-600/20 text-white"
+                      : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                  }`}
+                >
+                  {location}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={customLocation}
+              onChange={(event) => setCustomLocation(event.target.value)}
+              placeholder="Autre lieu (séparez par des virgules)..."
+              className="mt-3 w-full rounded-2xl border border-zinc-700 bg-zinc-900/60 p-3 text-sm text-white placeholder:text-zinc-500 focus:border-fuchsia-500 focus:outline-none"
+            />
           </section>
 
           <section>

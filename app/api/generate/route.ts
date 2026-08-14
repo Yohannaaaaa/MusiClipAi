@@ -12,6 +12,7 @@ interface GenerateRequestBody {
   characterDescription?: string;
   photoUrls?: string[];
   visualDirection?: string;
+  locations?: string[];
   quality?: string;
 }
 
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       songUrl: body.songUrl,
       character,
       visualDirection: body.visualDirection?.trim() ?? "",
+      locations: Array.isArray(body.locations) ? body.locations.filter((entry) => typeof entry === "string" && entry.trim()) : [],
       quality,
     });
     return NextResponse.json(result);
