@@ -37,10 +37,20 @@ export default function CreatePage() {
 
     try {
       const response = await fetch("/api/generate", { method: "POST", body: formData });
-      const data: GenerateResponse = await response.json();
-      setResult(data);
-    } catch {
-      setResult({ error: "Impossible de contacter le serveur. Réessayez." });
+
+      let data: GenerateResponse;
+      try {
+        data = await response.json();
+      } catch {
+        if (response.status === 413) {
+          throw new Error("Fichier trop volumineux pour l'hébergeur. Essayez une chanson plus légère (quelques Mo).");
+        }
+        throw new Error(`Réponse inattendue du serveur (HTTP ${response.status}).`);
+      }
+
+      setResult(response.ok ? data : { error: data.error ?? `Erreur serveur (HTTP ${response.status}).` });
+    } catch (error) {
+      setResult({ error: error instanceof Error ? error.message : "Impossible de contacter le serveur. Réessayez." });
     } finally {
       setIsSubmitting(false);
     }
@@ -95,6 +105,13 @@ export default function CreatePage() {
               required
               onChange={(event) => setSongFile(event.target.files?.[0] ?? null)}
             />
+            {songFile && songFile.size > 4 * 1024 * 1024 && (
+              <p className="mt-2 text-xs text-amber-400">
+                Fichier de {(songFile.size / (1024 * 1024)).toFixed(1)} Mo : sur cet hébergement, les fichiers
+                au-delà d&apos;environ 4 Mo peuvent être refusés par la plateforme avant même d&apos;atteindre
+                l&apos;application. Préférez un extrait plus court ou un encodage plus léger si l&apos;envoi échoue.
+              </p>
+            )}
           </section>
 
           <section>
