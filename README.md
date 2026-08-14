@@ -47,3 +47,12 @@ Limites à connaître :
 - La génération prend 1 à 3 minutes : `/api/generate` retourne immédiatement `{ status: "processing", jobId }`, et le front interroge `/api/status?jobId=...` toutes les 5 s jusqu'à `completed`/`failed` (voir `lib/video-provider.ts` et `app/create/page.tsx`).
 
 Pour connecter un autre service (Pika, Kling, Luma, ...), voir `lib/video-provider.ts` et `CLAUDE.md`.
+
+## Photos des cartes "Lieux" et "Style de danse" (Pexels)
+
+Les cartes de la page `/create` affichent une vraie photo (via l'API Pexels) par-dessus le dégradé de secours. Sans clé, ou si Pexels est indisponible, le dégradé + icône reste affiché — aucune casse.
+
+1. Créez un compte gratuit sur [pexels.com/api](https://www.pexels.com/api) et générez une clé API (immédiate, sans validation à attendre).
+2. Ajoutez `PEXELS_API_KEY=<votre clé>` dans Vercel (Environment Variables) ou `.env.local`.
+
+Les requêtes vers Pexels sont mises en cache 7 jours (`lib/pexels.ts`, `next: { revalidate }`) pour rester largement sous les quotas gratuits.

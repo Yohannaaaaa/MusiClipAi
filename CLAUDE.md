@@ -64,6 +64,17 @@ There is no test suite in this repo yet.
   receives `songUrl`/`photoUrls`/`locations`/`quality` to work with), add it to `providers`, and set
   `VIDEO_PROVIDER` accordingly. If the service is async like Runway, follow the same submit-then-poll shape via
   `getStatus`, and `/api/status` will work with it automatically.
+- **`lib/theme-options.ts`** — the shared catalog of `LOCATION_OPTIONS` and `DANCE_STYLE_OPTIONS` for the
+  `/create` card grids (id, label, icon, Tailwind gradient fallback, and a `query` string used for photo lookup).
+  Imported by both the client (`app/create/page.tsx`, for rendering) and the server (`app/api/theme-images/route.ts`,
+  for the Pexels query). Add new theme cards here, not inline in the page.
+- **`lib/pexels.ts`** + **`app/api/theme-images/route.ts`** — `GET /api/theme-images` looks up one photo per
+  theme (`getThemeImageUrl`, Pexels `/v1/search`, `next: { revalidate }`-cached for a week) and returns
+  `{ images: { [themeId]: url } }`, omitting any theme whose lookup failed. Requires `PEXELS_API_KEY`; without it
+  (or on any fetch error) `getThemeImageUrl` returns `null` and that theme is simply omitted from the response —
+  the client always has the Tailwind gradient in `theme-options.ts` as a visual fallback, so a missing/invalid key
+  degrades gracefully rather than breaking the page. `/create` fetches this once on mount and layers `<img>` over
+  the gradient per card, removing an entry from its local state (falling back to the gradient) `onError`.
 
 There is no database or auth. Uploaded audio/photos persist in Vercel Blob (not ephemeral like a request body) —
 nothing is ever written to local disk. Generation job state (Runway's `jobId`) lives entirely on the provider's

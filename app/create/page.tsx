@@ -2,7 +2,8 @@
 
 import { upload } from "@vercel/blob/client";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { DANCE_STYLE_OPTIONS, LOCATION_OPTIONS } from "@/lib/theme-options";
 
 type CharacterMode = "photos" | "description";
 type VideoQuality = "normal" | "4k" | "8k";
@@ -11,42 +12,6 @@ const QUALITY_OPTIONS: { value: VideoQuality; label: string; hint: string }[] = 
   { value: "normal", label: "Normale", hint: "1080p" },
   { value: "4k", label: "4K", hint: "2160p" },
   { value: "8k", label: "8K", hint: "4320p" },
-];
-
-type VisualOption = { id: string; label: string; icon: string; gradient: string };
-
-const LOCATION_OPTIONS: VisualOption[] = [
-  { id: "Plage", label: "Plage", icon: "🏖️", gradient: "from-amber-400 via-orange-500 to-sky-600" },
-  { id: "Ville la nuit", label: "Ville la nuit", icon: "🌃", gradient: "from-indigo-700 via-purple-700 to-black" },
-  { id: "Rooftop", label: "Rooftop", icon: "🏙️", gradient: "from-sky-600 via-indigo-600 to-purple-800" },
-  { id: "Studio", label: "Studio", icon: "🎙️", gradient: "from-zinc-600 via-zinc-800 to-black" },
-  { id: "Nature", label: "Nature", icon: "🌿", gradient: "from-emerald-500 via-green-700 to-zinc-900" },
-  { id: "Rue", label: "Rue", icon: "🚶", gradient: "from-stone-500 via-stone-700 to-zinc-900" },
-  { id: "Club / fête", label: "Club / fête", icon: "🎉", gradient: "from-fuchsia-600 via-purple-700 to-black" },
-  { id: "Intérieur cosy", label: "Intérieur cosy", icon: "🛋️", gradient: "from-amber-600 via-orange-800 to-zinc-900" },
-  { id: "New York", label: "New York", icon: "🗽", gradient: "from-yellow-500 via-orange-600 to-zinc-900" },
-  { id: "Désert", label: "Désert", icon: "🏜️", gradient: "from-orange-400 via-amber-600 to-red-900" },
-  { id: "Piscine", label: "Piscine", icon: "🏊", gradient: "from-cyan-400 via-sky-600 to-blue-800" },
-  { id: "Concert", label: "Concert", icon: "🎤", gradient: "from-rose-600 via-fuchsia-700 to-black" },
-  { id: "Forêt", label: "Forêt", icon: "🌲", gradient: "from-green-600 via-emerald-800 to-zinc-900" },
-  { id: "Voitures de luxe", label: "Voitures de luxe", icon: "🏎️", gradient: "from-red-600 via-zinc-700 to-black" },
-  { id: "Scène rétro", label: "Scène rétro", icon: "📼", gradient: "from-pink-500 via-purple-600 to-indigo-900" },
-  { id: "Marché nocturne", label: "Marché nocturne", icon: "🏮", gradient: "from-red-500 via-orange-600 to-zinc-900" },
-];
-
-const DANCE_STYLE_OPTIONS: VisualOption[] = [
-  { id: "Tango", label: "Tango", icon: "💃", gradient: "from-red-700 via-rose-800 to-black" },
-  { id: "Danse K-Pop", label: "Danse K-Pop", icon: "✨", gradient: "from-fuchsia-500 via-purple-600 to-indigo-800" },
-  { id: "Ballet", label: "Ballet", icon: "🩰", gradient: "from-pink-300 via-pink-500 to-purple-700" },
-  { id: "Hip-Hop", label: "Hip-Hop", icon: "🕺", gradient: "from-zinc-600 via-zinc-800 to-black" },
-  { id: "Pole Dance", label: "Pole Dance", icon: "💫", gradient: "from-purple-600 via-fuchsia-700 to-black" },
-  { id: "Breakdance", label: "Breakdance", icon: "🌀", gradient: "from-orange-500 via-red-600 to-zinc-900" },
-  { id: "Salsa", label: "Salsa", icon: "💃", gradient: "from-red-500 via-orange-600 to-amber-700" },
-  { id: "House Dance", label: "House Dance", icon: "🔊", gradient: "from-sky-500 via-indigo-600 to-purple-800" },
-  { id: "Danse afro", label: "Danse afro (Afrobeats)", icon: "🥁", gradient: "from-amber-500 via-orange-700 to-red-900" },
-  { id: "Bachata", label: "Bachata", icon: "❤️", gradient: "from-rose-500 via-red-700 to-zinc-900" },
-  { id: "Danse orientale", label: "Danse orientale", icon: "🪗", gradient: "from-amber-400 via-fuchsia-600 to-purple-800" },
-  { id: "Heels Dance", label: "Heels Dance", icon: "👠", gradient: "from-pink-600 via-fuchsia-700 to-black" },
 ];
 
 type GenerateResponse = {
@@ -74,6 +39,14 @@ export default function CreatePage() {
   const [quality, setQuality] = useState<VideoQuality>("normal");
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
+  const [themeImages, setThemeImages] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch("/api/theme-images")
+      .then((response) => response.json())
+      .then((data: { images?: Record<string, string> }) => setThemeImages(data.images ?? {}))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -345,6 +318,21 @@ export default function CreatePage() {
                       selected ? "ring-fuchsia-500" : "ring-transparent hover:ring-zinc-600"
                     }`}
                   >
+                    {themeImages[location.id] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={themeImages[location.id]}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={() =>
+                          setThemeImages((current) => {
+                            const next = { ...current };
+                            delete next[location.id];
+                            return next;
+                          })
+                        }
+                      />
+                    )}
                     <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                     <span className="absolute right-1.5 top-1.5 text-base drop-shadow" aria-hidden>
                       {location.icon}
@@ -390,6 +378,21 @@ export default function CreatePage() {
                       selected ? "ring-fuchsia-500" : "ring-transparent hover:ring-zinc-600"
                     }`}
                   >
+                    {themeImages[style.id] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={themeImages[style.id]}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={() =>
+                          setThemeImages((current) => {
+                            const next = { ...current };
+                            delete next[style.id];
+                            return next;
+                          })
+                        }
+                      />
+                    )}
                     <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                     <span className="absolute right-1.5 top-1.5 text-base drop-shadow" aria-hidden>
                       {style.icon}
