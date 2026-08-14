@@ -33,6 +33,17 @@ Sans ce store, l'upload échoue à l'étape d'autorisation (`/api/blob-upload`).
 
 ## Fournisseur de génération vidéo
 
-Aucune clé API n'est configurée par défaut : `VIDEO_PROVIDER` vaut `mock` et l'API `/api/generate` renvoie une réponse simulée décrivant les entrées reçues (y compris les URLs Blob), sans produire de vraie vidéo.
+Par défaut, `VIDEO_PROVIDER` vaut `mock` : `/api/generate` renvoie une réponse simulée décrivant les entrées reçues (y compris les URLs Blob), sans produire de vraie vidéo.
 
-Pour connecter un vrai service (Runway, Pika, Kling, ...), voir `lib/video-provider.ts` et `CLAUDE.md`.
+### Activer Runway (vraie génération vidéo)
+
+1. Créez un compte sur [runwayml.com](https://runwayml.com) (des crédits d'essai gratuits sont offerts à l'inscription, puis c'est payant à l'usage).
+2. **Account Settings → API Keys** → créez une clé.
+3. Dans Vercel (ou `.env.local` en local) : `VIDEO_PROVIDER=runway` et `RUNWAY_API_KEY=<votre clé>`.
+
+Limites à connaître :
+- Runway anime une **photo** (image → vidéo) : il faut au moins une photo de personnage (mode « Importer des photos »). Sans photo, la génération échoue avec un message explicite plutôt que d'appeler l'API pour rien.
+- Chaque clip généré dure environ 10 secondes, pas la durée totale de la chanson.
+- La génération prend 1 à 3 minutes : `/api/generate` retourne immédiatement `{ status: "processing", jobId }`, et le front interroge `/api/status?jobId=...` toutes les 5 s jusqu'à `completed`/`failed` (voir `lib/video-provider.ts` et `app/create/page.tsx`).
+
+Pour connecter un autre service (Pika, Kling, Luma, ...), voir `lib/video-provider.ts` et `CLAUDE.md`.

@@ -25,13 +25,17 @@ const LOCATION_OPTIONS = [
 ];
 
 type GenerateResponse = {
-  status?: "completed" | "failed";
+  status?: "completed" | "failed" | "processing";
   videoUrl?: string;
+  jobId?: string;
   message?: string;
   error?: string;
 };
 
 type Phase = "idle" | "uploading" | "generating";
+
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_ATTEMPTS = 60;
 
 export default function CreatePage() {
   const [songFile, setSongFile] = useState<File | null>(null);
@@ -95,12 +99,42 @@ export default function CreatePage() {
       });
 
       const data: GenerateResponse = await response.json();
-      setResult(response.ok ? data : { error: data.error ?? `Erreur serveur (HTTP ${response.status}).` });
+      if (!response.ok) {
+        setResult({ error: data.error ?? `Erreur serveur (HTTP ${response.status}).` });
+        return;
+      }
+
+      if (data.status === "processing" && data.jobId) {
+        setResult({ message: data.message });
+        await pollStatus(data.jobId);
+      } else {
+        setResult(data);
+      }
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : "Impossible de contacter le serveur. Réessayez." });
     } finally {
       setPhase("idle");
     }
+  }
+
+  async function pollStatus(jobId: string) {
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+      const response = await fetch(`/api/status?jobId=${encodeURIComponent(jobId)}`);
+      const data: GenerateResponse = await response.json();
+
+      if (!response.ok) {
+        setResult({ error: data.error ?? `Erreur serveur (HTTP ${response.status}).` });
+        return;
+      }
+      if (data.status === "completed" || data.status === "failed") {
+        setResult(data);
+        return;
+      }
+      setResult({ message: data.message });
+    }
+    setResult({ error: "La génération prend trop de temps. Réessayez plus tard." });
   }
 
   const isSubmitting = phase !== "idle";
