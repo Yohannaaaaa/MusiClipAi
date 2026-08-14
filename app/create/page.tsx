@@ -1,5 +1,6 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
@@ -12,51 +13,68 @@ type GenerateResponse = {
   error?: string;
 };
 
+type Phase = "idle" | "uploading" | "generating";
+
 export default function CreatePage() {
   const [songFile, setSongFile] = useState<File | null>(null);
   const [characterMode, setCharacterMode] = useState<CharacterMode | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [characterDescription, setCharacterDescription] = useState("");
   const [visualDirection, setVisualDirection] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!songFile) return;
 
-    setIsSubmitting(true);
     setResult(null);
 
-    const formData = new FormData();
-    formData.set("songName", songFile.name);
-    formData.set("songType", songFile.type);
-    formData.set("songSize", String(songFile.size));
-    formData.set("characterMode", characterMode ?? "none");
-    formData.set("characterDescription", characterDescription);
-    formData.set("visualDirection", visualDirection);
-    photos.forEach((photo) => formData.append("photoNames", photo.name));
-
     try {
-      const response = await fetch("/api/generate", { method: "POST", body: formData });
+      setPhase("uploading");
+      const songBlob = await upload(songFile.name, songFile, {
+        access: "public",
+        handleUploadUrl: "/api/blob-upload",
+      });
 
-      let data: GenerateResponse;
-      try {
-        data = await response.json();
-      } catch {
-        if (response.status === 413) {
-          throw new Error("Fichier trop volumineux pour l'hébergeur. Essayez une chanson plus légère (quelques Mo).");
-        }
-        throw new Error(`Réponse inattendue du serveur (HTTP ${response.status}).`);
+      let photoUrls: string[] = [];
+      if (characterMode === "photos" && photos.length > 0) {
+        photoUrls = await Promise.all(
+          photos.map(async (photo) => {
+            const blob = await upload(photo.name, photo, {
+              access: "public",
+              handleUploadUrl: "/api/blob-upload",
+            });
+            return blob.url;
+          }),
+        );
       }
 
+      setPhase("generating");
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          songName: songFile.name,
+          songType: songFile.type,
+          songUrl: songBlob.url,
+          characterMode: characterMode ?? "none",
+          characterDescription,
+          photoUrls,
+          visualDirection,
+        }),
+      });
+
+      const data: GenerateResponse = await response.json();
       setResult(response.ok ? data : { error: data.error ?? `Erreur serveur (HTTP ${response.status}).` });
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : "Impossible de contacter le serveur. Réessayez." });
     } finally {
-      setIsSubmitting(false);
+      setPhase("idle");
     }
   }
+
+  const isSubmitting = phase !== "idle";
 
   return (
     <div className="flex flex-1 justify-center bg-black">
@@ -108,8 +126,8 @@ export default function CreatePage() {
               onChange={(event) => setSongFile(event.target.files?.[0] ?? null)}
             />
             <p className="mt-2 text-xs text-zinc-500">
-              Étape actuelle : seuls le nom et les informations de votre chanson sont envoyés (aperçu simulé, aucune
-              vraie vidéo générée) — le fichier lui-même ne quitte pas votre appareil.
+              Le fichier est envoyé directement vers le stockage (Vercel Blob), sans passer par la limite de taille
+              du serveur. La génération elle-même reste simulée pour l&apos;instant.
             </p>
           </section>
 
@@ -216,7 +234,11 @@ export default function CreatePage() {
             disabled={!songFile || isSubmitting}
             className="w-full rounded-full bg-gradient-to-r from-fuchsia-600 to-purple-600 px-5 py-3.5 text-center font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isSubmitting ? "Génération en cours..." : "Générer mon clip musical →"}
+            {phase === "uploading"
+              ? "Téléversement..."
+              : phase === "generating"
+                ? "Génération en cours..."
+                : "Générer mon clip musical →"}
           </button>
         </form>
 

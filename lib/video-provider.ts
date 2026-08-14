@@ -1,11 +1,12 @@
 export type CharacterInput =
-  | { mode: "photos"; photoNames: string[] }
+  | { mode: "photos"; photoUrls: string[] }
   | { mode: "description"; description: string }
   | { mode: "none" };
 
 export interface VideoGenerationInput {
   songName: string;
   songType: string;
+  songUrl: string;
   character: CharacterInput;
   visualDirection: string;
 }
@@ -32,7 +33,7 @@ class MockVideoProvider implements VideoProvider {
     await delay(1200);
     const characterNote =
       input.character.mode === "photos"
-        ? `${input.character.photoNames.length} photo(s) de personnage reçue(s)`
+        ? `${input.character.photoUrls.length} photo(s) de personnage reçue(s)`
         : input.character.mode === "description"
           ? `personnage décrit : "${input.character.description}"`
           : "aucun personnage fourni";
@@ -40,7 +41,7 @@ class MockVideoProvider implements VideoProvider {
     return {
       status: "completed",
       message:
-        `Aperçu simulé (fournisseur "mock") : chanson "${input.songName}" reçue, ${characterNote}, ` +
+        `Aperçu simulé (fournisseur "mock") : chanson "${input.songName}" reçue (stockée sur Vercel Blob), ${characterNote}, ` +
         `direction visuelle : "${input.visualDirection || "aucune"}". ` +
         `Aucune vidéo réelle n'a été générée — connectez un vrai fournisseur (variable d'env VIDEO_PROVIDER) pour produire un vrai clip.`,
     };

@@ -27,24 +27,34 @@ There is no test suite in this repo yet.
 - **`app/page.tsx`** — cover/landing page (server component). Dark hero with CSS-gradient blobs and a CTA
   linking to `/create`. No client state.
 - **`app/create/page.tsx`** — the generation form (client component). Holds all form state (song file, character
-  mode `"photos" | "description" | null`, photos, character description, visual direction) and submits a
-  `multipart/form-data` POST to `/api/generate` on submit. The "photos" vs "description" character input is a
-  mutually-exclusive toggle, not a multi-field form — only the active mode's field is sent meaningfully.
-- **`app/api/generate/route.ts`** — the only API route. Validates the song file (presence, size ≤ 50 MB, MIME
-  type), parses character mode/photos/description and visual direction out of the `FormData`, then delegates to
-  `getVideoProvider().generate(...)`. Returns the provider's result as JSON, or a 400/500 with `{ error }`.
+  mode `"photos" | "description" | null`, photos, character description, visual direction). On submit it first
+  uploads the song (and any photos) **directly from the browser to Vercel Blob** via `upload()` from
+  `@vercel/blob/client`, then POSTs the resulting blob URLs + text fields as JSON to `/api/generate`. The
+  "photos" vs "description" character input is a mutually-exclusive toggle — only the active mode's field is
+  sent meaningfully.
+- **`app/api/blob-upload/route.ts`** — the Blob client-upload handshake (`handleUpload` from `@vercel/blob/client`).
+  The browser calls this route to get a scoped upload token before pushing bytes straight to Blob storage; the
+  file itself never passes through this (or any) serverless function, so there's no request-body-size ceiling on
+  uploads. Restricts `allowedContentTypes` to audio/image MIME types and caps size at 50 MB. Requires the
+  `BLOB_READ_WRITE_TOKEN` env var, which Vercel injects automatically once a Blob store is created and linked to
+  the project (Vercel dashboard → Storage → Blob) — there is no local fallback/mock for this token.
+- **`app/api/generate/route.ts`** — the only generation API route. Takes a JSON body (`songName`, `songType`,
+  `songUrl`, `characterMode`, `characterDescription`, `photoUrls`, `visualDirection`), builds a `CharacterInput`,
+  and delegates to `getVideoProvider().generate(...)`. Returns the provider's result as JSON, or a 400/500 with
+  `{ error }`.
 - **`lib/video-provider.ts`** — the pluggable video-generation abstraction. `VideoProvider` is the interface
   (`generate(input): Promise<VideoGenerationResult>`); providers are registered by string id in the `providers`
   map. Only `mock` is implemented (`MockVideoProvider`), which simulates a delay and echoes back what it
-  received without producing a real video — there is no third-party video API wired up. `getVideoProvider()`
-  reads `VIDEO_PROVIDER` from the environment (default `"mock"`) and throws a descriptive error for any
-  unregistered id.
+  received (including the Blob URLs) without producing a real video — there is no third-party video API wired
+  up. `getVideoProvider()` reads `VIDEO_PROVIDER` from the environment (default `"mock"`) and throws a
+  descriptive error for any unregistered id.
 
-  To connect a real service (Runway, Pika, Kling, ...): implement `VideoProvider` in this file, add it to
-  `providers`, and set `VIDEO_PROVIDER` (e.g. in `.env.local`) to that id.
+  To connect a real service (Runway, Pika, Kling, ...): implement `VideoProvider` in this file (it already
+  receives `songUrl`/`photoUrls` it can fetch from), add it to `providers`, and set `VIDEO_PROVIDER` (e.g. in
+  `.env.local`) to that id.
 
-There is no database, auth, or persistent storage — uploaded files exist only for the duration of a single
-request and are never written to disk.
+There is no database or auth. Uploaded audio/photos persist in Vercel Blob (not ephemeral like a request body) —
+nothing is ever written to local disk.
 
 ## Conventions
 
