@@ -123,7 +123,7 @@ class RunwayVideoProvider implements VideoProvider {
         promptImage,
         promptText: promptText || undefined,
         model: input.quality === "8k" ? "gen4_turbo" : "gen3a_turbo",
-        ratio: "1280:768",
+        ratio: "1280:720",
         duration: 10,
       }),
     });
