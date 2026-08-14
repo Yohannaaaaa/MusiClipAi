@@ -3,13 +3,22 @@ export type CharacterInput =
   | { mode: "description"; description: string }
   | { mode: "none" };
 
+export type VideoQuality = "normal" | "4k" | "8k";
+
 export interface VideoGenerationInput {
   songName: string;
   songType: string;
   songUrl: string;
   character: CharacterInput;
   visualDirection: string;
+  quality: VideoQuality;
 }
+
+const QUALITY_LABELS: Record<VideoQuality, string> = {
+  normal: "normale (1080p)",
+  "4k": "4K (2160p)",
+  "8k": "8K (4320p)",
+};
 
 export interface VideoGenerationResult {
   status: "completed" | "failed";
@@ -42,7 +51,7 @@ class MockVideoProvider implements VideoProvider {
       status: "completed",
       message:
         `Aperçu simulé (fournisseur "mock") : chanson "${input.songName}" reçue (stockée sur Vercel Blob), ${characterNote}, ` +
-        `direction visuelle : "${input.visualDirection || "aucune"}". ` +
+        `direction visuelle : "${input.visualDirection || "aucune"}", qualité demandée : ${QUALITY_LABELS[input.quality]}. ` +
         `Aucune vidéo réelle n'a été générée — connectez un vrai fournisseur (variable d'env VIDEO_PROVIDER) pour produire un vrai clip.`,
     };
   }

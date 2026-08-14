@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getVideoProvider, type CharacterInput } from "@/lib/video-provider";
 
+const VIDEO_QUALITIES = ["normal", "4k", "8k"] as const;
+type VideoQuality = (typeof VIDEO_QUALITIES)[number];
+
 interface GenerateRequestBody {
   songName?: string;
   songType?: string;
@@ -9,6 +12,7 @@ interface GenerateRequestBody {
   characterDescription?: string;
   photoUrls?: string[];
   visualDirection?: string;
+  quality?: string;
 }
 
 export async function POST(request: Request) {
@@ -25,6 +29,10 @@ export async function POST(request: Request) {
     character = { mode: "description", description: body.characterDescription.trim() };
   }
 
+  const quality: VideoQuality = VIDEO_QUALITIES.includes(body.quality as VideoQuality)
+    ? (body.quality as VideoQuality)
+    : "normal";
+
   const provider = getVideoProvider();
 
   try {
@@ -34,6 +42,7 @@ export async function POST(request: Request) {
       songUrl: body.songUrl,
       character,
       visualDirection: body.visualDirection?.trim() ?? "",
+      quality,
     });
     return NextResponse.json(result);
   } catch (error) {

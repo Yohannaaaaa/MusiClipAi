@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 type CharacterMode = "photos" | "description";
+type VideoQuality = "normal" | "4k" | "8k";
+
+const QUALITY_OPTIONS: { value: VideoQuality; label: string; hint: string }[] = [
+  { value: "normal", label: "Normale", hint: "1080p" },
+  { value: "4k", label: "4K", hint: "2160p" },
+  { value: "8k", label: "8K", hint: "4320p" },
+];
 
 type GenerateResponse = {
   status?: "completed" | "failed";
@@ -21,6 +28,7 @@ export default function CreatePage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [characterDescription, setCharacterDescription] = useState("");
   const [visualDirection, setVisualDirection] = useState("");
+  const [quality, setQuality] = useState<VideoQuality>("normal");
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
 
@@ -62,6 +70,7 @@ export default function CreatePage() {
           characterDescription,
           photoUrls,
           visualDirection,
+          quality,
         }),
       });
 
@@ -226,6 +235,30 @@ export default function CreatePage() {
               <span aria-hidden className="absolute bottom-3 right-3 text-zinc-500">
                 ⊕
               </span>
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span aria-hidden className="text-fuchsia-500">
+                🎬
+              </span>
+              <h2 className="text-sm font-medium text-white">Qualité vidéo</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {QUALITY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setQuality(option.value)}
+                  className={`flex flex-col items-center gap-0.5 rounded-2xl border bg-zinc-900/60 px-3 py-3 text-center transition-colors ${
+                    quality === option.value ? "border-fuchsia-500" : "border-zinc-700 hover:border-zinc-500"
+                  }`}
+                >
+                  <span className="text-sm font-medium text-white">{option.label}</span>
+                  <span className="text-xs text-zinc-500">{option.hint}</span>
+                </button>
+              ))}
             </div>
           </section>
 
