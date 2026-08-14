@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { generations } from "@/db/schema";
 import { getVideoProvider, type CharacterInput } from "@/lib/video-provider";
 
 const VIDEO_QUALITIES = ["normal", "4k", "8k"] as const;
@@ -34,6 +37,9 @@ export async function POST(request: Request) {
   const quality: VideoQuality = VIDEO_QUALITIES.includes(body.quality as VideoQuality)
     ? (body.quality as VideoQuality)
     : "normal";
+  const locations = Array.isArray(body.locations) ? body.locations.filter((entry) => typeof entry === "string" && entry.trim()) : [];
+  const danceStyle = typeof body.danceStyle === "string" && body.danceStyle.trim() ? body.danceStyle.trim() : null;
+  const visualDirection = body.visualDirection?.trim() ?? "";
 
   const provider = getVideoProvider();
 
@@ -43,11 +49,33 @@ export async function POST(request: Request) {
       songType: body.songType ?? "",
       songUrl: body.songUrl,
       character,
-      visualDirection: body.visualDirection?.trim() ?? "",
-      locations: Array.isArray(body.locations) ? body.locations.filter((entry) => typeof entry === "string" && entry.trim()) : [],
-      danceStyle: typeof body.danceStyle === "string" && body.danceStyle.trim() ? body.danceStyle.trim() : null,
+      visualDirection,
+      locations,
+      danceStyle,
       quality,
     });
+
+    try {
+      const session = await auth();
+      if (session?.user?.id) {
+        await db.insert(generations).values({
+          userId: session.user.id,
+          songName: body.songName,
+          songUrl: body.songUrl,
+          status: result.status,
+          jobId: result.jobId ?? null,
+          videoUrl: result.videoUrl ?? null,
+          message: result.message,
+          locations,
+          danceStyle,
+          quality,
+          visualDirection,
+        });
+      }
+    } catch {
+      // Best-effort history save — never let a DB hiccup mask a successful generation.
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue lors de la génération.";

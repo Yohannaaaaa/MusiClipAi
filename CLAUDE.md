@@ -76,9 +76,46 @@ There is no test suite in this repo yet.
   degrades gracefully rather than breaking the page. `/create` fetches this once on mount and layers `<img>` over
   the gradient per card, removing an entry from its local state (falling back to the gradient) `onError`.
 
-There is no database or auth. Uploaded audio/photos persist in Vercel Blob (not ephemeral like a request body) —
-nothing is ever written to local disk. Generation job state (Runway's `jobId`) lives entirely on the provider's
-side; this app doesn't persist job records anywhere itself.
+Uploaded audio/photos persist in Vercel Blob (not ephemeral like a request body) — nothing is ever written to
+local disk.
+
+## Auth & database (Neon + Auth.js)
+
+- **`auth.ts`** — Auth.js v5 (`next-auth@beta`) config: `DrizzleAdapter` (Neon Postgres), `session: { strategy:
+  "jwt" }` (required because the `Credentials` provider can't use database sessions), three providers — `Google`
+  (env-var convention `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, auto-detected by name), `Resend` (magic-link email,
+  `AUTH_RESEND_KEY`), and `Credentials` (email + bcrypt-hashed password, `authorize()` reads directly from the
+  `users` table). The `session` callback copies `token.sub` onto `session.user.id` (not there by default) —
+  `types/next-auth.d.ts` augments the `Session` type to match. Exports `handlers`/`auth`/`signIn`/`signOut`,
+  consumed by `app/api/auth/[...nextauth]/route.ts` and server components/routes that call `auth()`.
+- **`app/api/auth/register/route.ts`** — the only piece Auth.js doesn't provide: password-based signup. Hashes
+  with bcrypt and inserts into `users` directly; the `Credentials` provider only *validates* on sign-in.
+- **`app/login/page.tsx`** — single page for all three flows (Google button, login/register password form, magic
+  link), toggled by local `mode` state. Password sign-in calls `signIn("credentials", { redirect: false })` and
+  routes to `/create` on success; register POSTs to `/api/auth/register` first, then signs in the same way.
+- **`app/providers.tsx`** — wraps the app in `next-auth/react`'s `SessionProvider` (added in `app/layout.tsx`) so
+  `useSession()`/`signOut()` work client-side, e.g. the `AuthStatus` component in `app/create/page.tsx`.
+- **`db/schema.ts`** — Drizzle Postgres schema: the standard Auth.js adapter tables (`users`, `accounts`,
+  `sessions`, `verificationTokens` — table/column names matter, they're what `DrizzleAdapter` expects) plus
+  `generations`, this app's own clip-history table (`userId`, song/video URLs, `status`, `jobId` for matching
+  async updates, `locations`/`quality`/`danceStyle`/`visualDirection` snapshot of the request). `users` also gets
+  a non-standard `passwordHash` column for the Credentials provider.
+- **`db/index.ts`** — the Drizzle client (`@neondatabase/serverless` HTTP driver). Deliberately never throws at
+  module load (falls back to a syntactically-valid-but-bogus connection string when `DATABASE_URL` is unset) —
+  an eager throw here previously broke `next build`'s route analysis, since every route file that imports `db`
+  gets evaluated during "Collecting page data" regardless of whether it's ever invoked. A missing/bad
+  `DATABASE_URL` now only fails naturally the first time a query actually runs.
+- **`drizzle.config.ts`** + `npm run db:push` — pushes `db/schema.ts` straight to Postgres (no migration files;
+  fine at this project's size). Needs `DATABASE_URL` set when run.
+- History save/update in `app/api/generate/route.ts` and `app/api/status/route.ts` is **best-effort**: wrapped in
+  its own try/catch so a DB outage never turns a successful generation into an error response — it just isn't
+  recorded. Both routes call `auth()` and only touch `generations` when a session exists; anonymous generation
+  still works with no account at all.
+- **`app/history/page.tsx`** — server component, redirects to `/login` if `auth()` has no session, otherwise
+  lists that user's `generations` rows newest-first.
+
+There is no database access outside these files, and nothing else in the app requires a session — `/create`
+works fully signed-out.
 
 ## Conventions
 

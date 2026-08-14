@@ -1,4 +1,8 @@
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { generations } from "@/db/schema";
 import { getVideoProvider } from "@/lib/video-provider";
 
 export async function GET(request: Request) {
@@ -14,6 +18,21 @@ export async function GET(request: Request) {
 
   try {
     const result = await provider.getStatus(jobId);
+
+    if (result.status === "completed" || result.status === "failed") {
+      try {
+        const session = await auth();
+        if (session?.user?.id) {
+          await db
+            .update(generations)
+            .set({ status: result.status, videoUrl: result.videoUrl ?? null, message: result.message })
+            .where(and(eq(generations.jobId, jobId), eq(generations.userId, session.user.id)));
+        }
+      } catch {
+        // Best-effort history update — never let a DB hiccup mask the actual generation status.
+      }
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue lors de la vérification du statut.";

@@ -2,6 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { DANCE_STYLE_OPTIONS, LOCATION_OPTIONS } from "@/lib/theme-options";
 
@@ -13,6 +14,31 @@ const QUALITY_OPTIONS: { value: VideoQuality; label: string; hint: string }[] = 
   { value: "4k", label: "4K", hint: "2160p" },
   { value: "8k", label: "8K", hint: "4320p" },
 ];
+
+function AuthStatus() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") return null;
+
+  if (!session) {
+    return (
+      <Link href="/login" className="text-sm font-medium text-zinc-400 hover:text-fuchsia-400">
+        Se connecter
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <Link href="/history" className="text-zinc-400 hover:text-fuchsia-400">
+        Historique
+      </Link>
+      <button type="button" onClick={() => signOut()} className="text-zinc-500 hover:text-fuchsia-400">
+        Déconnexion
+      </button>
+    </div>
+  );
+}
 
 type GenerateResponse = {
   status?: "completed" | "failed" | "processing";
@@ -156,7 +182,8 @@ export default function CreatePage() {
           >
             ←
           </Link>
-          <h1 className="text-lg font-semibold text-white">Clip musical</h1>
+          <h1 className="flex-1 text-lg font-semibold text-white">Clip musical</h1>
+          <AuthStatus />
         </div>
 
         <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-fuchsia-700 via-purple-800 to-black">

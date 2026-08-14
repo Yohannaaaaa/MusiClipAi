@@ -56,3 +56,28 @@ Les cartes de la page `/create` affichent une vraie photo (via l'API Pexels) par
 2. Ajoutez `PEXELS_API_KEY=<votre clé>` dans Vercel (Environment Variables) ou `.env.local`.
 
 Les requêtes vers Pexels sont mises en cache 7 jours (`lib/pexels.ts`, `next: { revalidate }`) pour rester largement sous les quotas gratuits.
+
+## Comptes utilisateurs + historique des clips (Neon + Auth.js)
+
+Trois connexions possibles : Google, email + mot de passe, ou lien magique par email. Une fois connecté, chaque
+génération est enregistrée et visible sur `/history`. Sans configuration, l'app fonctionne quand même : la
+sauvegarde d'historique échoue silencieusement (best-effort) et la génération continue de répondre normalement.
+
+Variables d'environnement à ajouter sur Vercel :
+
+| Variable | D'où vient-elle | Obligatoire pour |
+| --- | --- | --- |
+| `DATABASE_URL` | Injectée automatiquement en connectant une base **Neon** au projet (Vercel → Storage → Neon) | Comptes + historique |
+| `AUTH_SECRET` | À générer vous-même (`npx auth secret` en local, ou une chaîne aléatoire longue) | Obligatoire dès que Auth.js est utilisé |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google Cloud Console → *APIs & Services* → *Credentials* → *Create OAuth client ID* (type "Web application"). URI de redirection à autoriser : `https://<votre-domaine>/api/auth/callback/google` | Connexion Google |
+| `AUTH_RESEND_KEY` | [resend.com](https://resend.com) → compte gratuit → API Keys | Lien magique par email |
+| `EMAIL_FROM` (optionnel) | Une adresse d'expéditeur. Sans domaine vérifié sur Resend, gardez la valeur par défaut `MusiClip AI <onboarding@resend.dev>` (fonctionne uniquement pour tester avec l'email du compte Resend) | Lien magique par email |
+
+Après avoir connecté Neon, appliquez le schéma (tables `user`, `account`, `session`, `verificationToken`,
+`generation`) avec :
+
+```bash
+DATABASE_URL="<votre chaîne de connexion Neon>" npm run db:push
+```
+
+La connexion Google + mot de passe fonctionnent sans Resend ; le lien magique seul nécessite `AUTH_RESEND_KEY`.
