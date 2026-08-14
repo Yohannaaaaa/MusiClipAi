@@ -1,0 +1,65 @@
+export type CharacterInput =
+  | { mode: "photos"; photoNames: string[] }
+  | { mode: "description"; description: string }
+  | { mode: "none" };
+
+export interface VideoGenerationInput {
+  songName: string;
+  songType: string;
+  character: CharacterInput;
+  visualDirection: string;
+}
+
+export interface VideoGenerationResult {
+  status: "completed" | "failed";
+  videoUrl?: string;
+  message: string;
+}
+
+export interface VideoProvider {
+  readonly id: string;
+  generate(input: VideoGenerationInput): Promise<VideoGenerationResult>;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+class MockVideoProvider implements VideoProvider {
+  readonly id = "mock";
+
+  async generate(input: VideoGenerationInput): Promise<VideoGenerationResult> {
+    await delay(1200);
+    const characterNote =
+      input.character.mode === "photos"
+        ? `${input.character.photoNames.length} photo(s) de personnage reçue(s)`
+        : input.character.mode === "description"
+          ? `personnage décrit : "${input.character.description}"`
+          : "aucun personnage fourni";
+
+    return {
+      status: "completed",
+      message:
+        `Aperçu simulé (fournisseur "mock") : chanson "${input.songName}" reçue, ${characterNote}, ` +
+        `direction visuelle : "${input.visualDirection || "aucune"}". ` +
+        `Aucune vidéo réelle n'a été générée — connectez un vrai fournisseur (variable d'env VIDEO_PROVIDER) pour produire un vrai clip.`,
+    };
+  }
+}
+
+const providers: Record<string, () => VideoProvider> = {
+  mock: () => new MockVideoProvider(),
+};
+
+export function getVideoProvider(): VideoProvider {
+  const id = process.env.VIDEO_PROVIDER ?? "mock";
+  const factory = providers[id];
+  if (!factory) {
+    throw new Error(
+      `Fournisseur vidéo "${id}" inconnu ou non configuré. Seul "mock" est implémenté. ` +
+        `Pour connecter un vrai service (Runway, Pika, Kling, ...), ajoutez une classe VideoProvider dans lib/video-provider.ts, ` +
+        `enregistrez-la dans "providers", puis définissez VIDEO_PROVIDER dans .env.local.`,
+    );
+  }
+  return factory();
+}
