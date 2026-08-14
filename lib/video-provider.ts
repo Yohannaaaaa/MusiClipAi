@@ -12,6 +12,7 @@ export interface VideoGenerationInput {
   character: CharacterInput;
   visualDirection: string;
   locations: string[];
+  danceStyle: string | null;
   quality: VideoQuality;
 }
 
@@ -51,12 +52,13 @@ class MockVideoProvider implements VideoProvider {
           : "aucun personnage fourni";
 
     const locationsNote = input.locations.length > 0 ? input.locations.join(", ") : "aucun lieu précisé";
+    const danceNote = input.danceStyle ? `, style de danse : ${input.danceStyle}` : "";
 
     return {
       status: "completed",
       message:
         `Aperçu simulé (fournisseur "mock") : chanson "${input.songName}" reçue (stockée sur Vercel Blob), ${characterNote}, ` +
-        `direction visuelle : "${input.visualDirection || "aucune"}", lieux : ${locationsNote}, ` +
+        `direction visuelle : "${input.visualDirection || "aucune"}", lieux : ${locationsNote}${danceNote}, ` +
         `qualité demandée : ${QUALITY_LABELS[input.quality]}. ` +
         `Aucune vidéo réelle n'a été générée — connectez un vrai fournisseur (variable d'env VIDEO_PROVIDER) pour produire un vrai clip.`,
     };
@@ -106,7 +108,11 @@ class RunwayVideoProvider implements VideoProvider {
       };
     }
 
-    const promptText = [input.visualDirection, input.locations.length > 0 ? `Lieux : ${input.locations.join(", ")}` : ""]
+    const promptText = [
+      input.visualDirection,
+      input.locations.length > 0 ? `Lieux : ${input.locations.join(", ")}` : "",
+      input.danceStyle ? `La personne danse un style ${input.danceStyle}` : "",
+    ]
       .filter(Boolean)
       .join(". ");
 

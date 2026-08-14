@@ -13,15 +13,40 @@ const QUALITY_OPTIONS: { value: VideoQuality; label: string; hint: string }[] = 
   { value: "8k", label: "8K", hint: "4320p" },
 ];
 
-const LOCATION_OPTIONS = [
-  "Plage",
-  "Ville la nuit",
-  "Rooftop",
-  "Studio",
-  "Nature",
-  "Rue",
-  "Club / fête",
-  "Intérieur cosy",
+type VisualOption = { id: string; label: string; icon: string; gradient: string };
+
+const LOCATION_OPTIONS: VisualOption[] = [
+  { id: "Plage", label: "Plage", icon: "🏖️", gradient: "from-amber-400 via-orange-500 to-sky-600" },
+  { id: "Ville la nuit", label: "Ville la nuit", icon: "🌃", gradient: "from-indigo-700 via-purple-700 to-black" },
+  { id: "Rooftop", label: "Rooftop", icon: "🏙️", gradient: "from-sky-600 via-indigo-600 to-purple-800" },
+  { id: "Studio", label: "Studio", icon: "🎙️", gradient: "from-zinc-600 via-zinc-800 to-black" },
+  { id: "Nature", label: "Nature", icon: "🌿", gradient: "from-emerald-500 via-green-700 to-zinc-900" },
+  { id: "Rue", label: "Rue", icon: "🚶", gradient: "from-stone-500 via-stone-700 to-zinc-900" },
+  { id: "Club / fête", label: "Club / fête", icon: "🎉", gradient: "from-fuchsia-600 via-purple-700 to-black" },
+  { id: "Intérieur cosy", label: "Intérieur cosy", icon: "🛋️", gradient: "from-amber-600 via-orange-800 to-zinc-900" },
+  { id: "New York", label: "New York", icon: "🗽", gradient: "from-yellow-500 via-orange-600 to-zinc-900" },
+  { id: "Désert", label: "Désert", icon: "🏜️", gradient: "from-orange-400 via-amber-600 to-red-900" },
+  { id: "Piscine", label: "Piscine", icon: "🏊", gradient: "from-cyan-400 via-sky-600 to-blue-800" },
+  { id: "Concert", label: "Concert", icon: "🎤", gradient: "from-rose-600 via-fuchsia-700 to-black" },
+  { id: "Forêt", label: "Forêt", icon: "🌲", gradient: "from-green-600 via-emerald-800 to-zinc-900" },
+  { id: "Voitures de luxe", label: "Voitures de luxe", icon: "🏎️", gradient: "from-red-600 via-zinc-700 to-black" },
+  { id: "Scène rétro", label: "Scène rétro", icon: "📼", gradient: "from-pink-500 via-purple-600 to-indigo-900" },
+  { id: "Marché nocturne", label: "Marché nocturne", icon: "🏮", gradient: "from-red-500 via-orange-600 to-zinc-900" },
+];
+
+const DANCE_STYLE_OPTIONS: VisualOption[] = [
+  { id: "Tango", label: "Tango", icon: "💃", gradient: "from-red-700 via-rose-800 to-black" },
+  { id: "Danse K-Pop", label: "Danse K-Pop", icon: "✨", gradient: "from-fuchsia-500 via-purple-600 to-indigo-800" },
+  { id: "Ballet", label: "Ballet", icon: "🩰", gradient: "from-pink-300 via-pink-500 to-purple-700" },
+  { id: "Hip-Hop", label: "Hip-Hop", icon: "🕺", gradient: "from-zinc-600 via-zinc-800 to-black" },
+  { id: "Pole Dance", label: "Pole Dance", icon: "💫", gradient: "from-purple-600 via-fuchsia-700 to-black" },
+  { id: "Breakdance", label: "Breakdance", icon: "🌀", gradient: "from-orange-500 via-red-600 to-zinc-900" },
+  { id: "Salsa", label: "Salsa", icon: "💃", gradient: "from-red-500 via-orange-600 to-amber-700" },
+  { id: "House Dance", label: "House Dance", icon: "🔊", gradient: "from-sky-500 via-indigo-600 to-purple-800" },
+  { id: "Danse afro", label: "Danse afro (Afrobeats)", icon: "🥁", gradient: "from-amber-500 via-orange-700 to-red-900" },
+  { id: "Bachata", label: "Bachata", icon: "❤️", gradient: "from-rose-500 via-red-700 to-zinc-900" },
+  { id: "Danse orientale", label: "Danse orientale", icon: "🪗", gradient: "from-amber-400 via-fuchsia-600 to-purple-800" },
+  { id: "Heels Dance", label: "Heels Dance", icon: "👠", gradient: "from-pink-600 via-fuchsia-700 to-black" },
 ];
 
 type GenerateResponse = {
@@ -45,6 +70,7 @@ export default function CreatePage() {
   const [visualDirection, setVisualDirection] = useState("");
   const [locations, setLocations] = useState<string[]>([]);
   const [customLocation, setCustomLocation] = useState("");
+  const [danceStyle, setDanceStyle] = useState<string | null>(null);
   const [quality, setQuality] = useState<VideoQuality>("normal");
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
@@ -94,6 +120,7 @@ export default function CreatePage() {
           photoUrls,
           visualDirection,
           locations: allLocations,
+          danceStyle,
           quality,
         }),
       });
@@ -306,21 +333,33 @@ export default function CreatePage() {
               <h2 className="text-sm font-medium text-white">Lieux du clip</h2>
               <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">Optionnel</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {LOCATION_OPTIONS.map((location) => (
-                <button
-                  key={location}
-                  type="button"
-                  onClick={() => toggleLocation(location)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    locations.includes(location)
-                      ? "border-fuchsia-500 bg-fuchsia-600/20 text-white"
-                      : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
-                  }`}
-                >
-                  {location}
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-2">
+              {LOCATION_OPTIONS.map((location) => {
+                const selected = locations.includes(location.id);
+                return (
+                  <button
+                    key={location.id}
+                    type="button"
+                    onClick={() => toggleLocation(location.id)}
+                    className={`relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br text-left ring-2 transition-all ${location.gradient} ${
+                      selected ? "ring-fuchsia-500" : "ring-transparent hover:ring-zinc-600"
+                    }`}
+                  >
+                    <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                    <span className="absolute right-1.5 top-1.5 text-base drop-shadow" aria-hidden>
+                      {location.icon}
+                    </span>
+                    {selected && (
+                      <span className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-500 text-[10px] text-white">
+                        ✓
+                      </span>
+                    )}
+                    <span className="absolute inset-x-1.5 bottom-1.5 text-xs font-medium leading-tight text-white drop-shadow">
+                      {location.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <input
               type="text"
@@ -329,6 +368,44 @@ export default function CreatePage() {
               placeholder="Autre lieu (séparez par des virgules)..."
               className="mt-3 w-full rounded-2xl border border-zinc-700 bg-zinc-900/60 p-3 text-sm text-white placeholder:text-zinc-500 focus:border-fuchsia-500 focus:outline-none"
             />
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span aria-hidden className="text-fuchsia-500">
+                💃
+              </span>
+              <h2 className="text-sm font-medium text-white">Style de danse</h2>
+              <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">Optionnel</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {DANCE_STYLE_OPTIONS.map((style) => {
+                const selected = danceStyle === style.id;
+                return (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setDanceStyle(selected ? null : style.id)}
+                    className={`relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br text-left ring-2 transition-all ${style.gradient} ${
+                      selected ? "ring-fuchsia-500" : "ring-transparent hover:ring-zinc-600"
+                    }`}
+                  >
+                    <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                    <span className="absolute right-1.5 top-1.5 text-base drop-shadow" aria-hidden>
+                      {style.icon}
+                    </span>
+                    {selected && (
+                      <span className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-500 text-[10px] text-white">
+                        ✓
+                      </span>
+                    )}
+                    <span className="absolute inset-x-1.5 bottom-1.5 text-xs font-medium leading-tight text-white drop-shadow">
+                      {style.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </section>
 
           <section>
