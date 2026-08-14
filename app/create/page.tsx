@@ -29,11 +29,13 @@ export default function CreatePage() {
     setResult(null);
 
     const formData = new FormData();
-    formData.set("song", songFile);
+    formData.set("songName", songFile.name);
+    formData.set("songType", songFile.type);
+    formData.set("songSize", String(songFile.size));
     formData.set("characterMode", characterMode ?? "none");
     formData.set("characterDescription", characterDescription);
     formData.set("visualDirection", visualDirection);
-    photos.forEach((photo) => formData.append("photos", photo));
+    photos.forEach((photo) => formData.append("photoNames", photo.name));
 
     try {
       const response = await fetch("/api/generate", { method: "POST", body: formData });
@@ -105,13 +107,10 @@ export default function CreatePage() {
               required
               onChange={(event) => setSongFile(event.target.files?.[0] ?? null)}
             />
-            {songFile && songFile.size > 4 * 1024 * 1024 && (
-              <p className="mt-2 text-xs text-amber-400">
-                Fichier de {(songFile.size / (1024 * 1024)).toFixed(1)} Mo : sur cet hébergement, les fichiers
-                au-delà d&apos;environ 4 Mo peuvent être refusés par la plateforme avant même d&apos;atteindre
-                l&apos;application. Préférez un extrait plus court ou un encodage plus léger si l&apos;envoi échoue.
-              </p>
-            )}
+            <p className="mt-2 text-xs text-zinc-500">
+              Étape actuelle : seuls le nom et les informations de votre chanson sont envoyés (aperçu simulé, aucune
+              vraie vidéo générée) — le fichier lui-même ne quitte pas votre appareil.
+            </p>
           </section>
 
           <section>
