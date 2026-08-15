@@ -1,3 +1,5 @@
+import { RUNWAY_CLIP_DURATION_SECONDS } from "./runway-pricing";
+
 export type CharacterInput =
   | { mode: "photos"; photoUrls: string[] }
   | { mode: "description"; description: string }
@@ -124,7 +126,7 @@ class RunwayVideoProvider implements VideoProvider {
         promptText: promptText || undefined,
         model: input.quality === "8k" ? "gen4_turbo" : "gen3a_turbo",
         ratio: "1280:720",
-        duration: 10,
+        duration: RUNWAY_CLIP_DURATION_SECONDS,
       }),
     });
 

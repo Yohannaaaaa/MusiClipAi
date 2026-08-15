@@ -4,6 +4,7 @@ import { upload } from "@vercel/blob/client";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState, type FormEvent } from "react";
+import { RUNWAY_CLIP_DURATION_SECONDS, RUNWAY_COST_USD_PER_CLIP, RUNWAY_CREDITS_PER_CLIP } from "@/lib/runway-pricing";
 import { DANCE_STYLE_OPTIONS, LOCATION_OPTIONS } from "@/lib/theme-options";
 
 type CharacterMode = "photos" | "description";
@@ -460,6 +461,13 @@ export default function CreatePage() {
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              Coût estimé sur Runway pour ce clip ({RUNWAY_CLIP_DURATION_SECONDS} s) :{" "}
+              <span className="font-medium text-zinc-300">
+                {RUNWAY_CREDITS_PER_CLIP} crédits (~{RUNWAY_COST_USD_PER_CLIP.toFixed(2)} $)
+              </span>{" "}
+              — estimation d&apos;après les tarifs publics de Runway, susceptible de changer.
+            </p>
           </section>
 
           <button
