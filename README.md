@@ -73,8 +73,12 @@ Variables d'environnement à ajouter sur Vercel :
 | `AUTH_RESEND_KEY` | [resend.com](https://resend.com) → compte gratuit → API Keys | Lien magique par email |
 | `EMAIL_FROM` (optionnel) | Une adresse d'expéditeur. Sans domaine vérifié sur Resend, gardez la valeur par défaut `MusiClip AI <onboarding@resend.dev>` (fonctionne uniquement pour tester avec l'email du compte Resend) | Lien magique par email |
 
-Après avoir connecté Neon, appliquez le schéma (tables `user`, `account`, `session`, `verificationToken`,
-`generation`) avec :
+Le schéma (tables `user`, `account`, `session`, `verificationToken`, `generation`) est appliqué **automatiquement
+à chaque déploiement Vercel** : `scripts/db-push-if-configured.mjs` lance `drizzle-kit push --force` avant `next
+build` dès que `DATABASE_URL` est présente (sinon il est simplement ignoré — le build local sans base fonctionne
+toujours). Aucune commande manuelle n'est nécessaire une fois Neon connecté ; redéployez simplement.
+
+Pour l'appliquer manuellement en local :
 
 ```bash
 DATABASE_URL="<votre chaîne de connexion Neon>" npm run db:push

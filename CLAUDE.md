@@ -106,7 +106,11 @@ local disk.
   gets evaluated during "Collecting page data" regardless of whether it's ever invoked. A missing/bad
   `DATABASE_URL` now only fails naturally the first time a query actually runs.
 - **`drizzle.config.ts`** + `npm run db:push` — pushes `db/schema.ts` straight to Postgres (no migration files;
-  fine at this project's size). Needs `DATABASE_URL` set when run.
+  fine at this project's size). Needs `DATABASE_URL` set when run. `scripts/db-push-if-configured.mjs` runs this
+  automatically as part of `npm run build` (Vercel's build command) whenever `DATABASE_URL`/`POSTGRES_URL` is
+  set, and no-ops otherwise — added because this sandbox's network egress can't reach Neon at all (even a
+  websocket connection hangs indefinitely), so schema changes can only be verified once deployed on Vercel, not
+  from a local/agent shell here.
 - History save/update in `app/api/generate/route.ts` and `app/api/status/route.ts` is **best-effort**: wrapped in
   its own try/catch so a DB outage never turns a successful generation into an error response — it just isn't
   recorded. Both routes call `auth()` and only touch `generations` when a session exists; anonymous generation
