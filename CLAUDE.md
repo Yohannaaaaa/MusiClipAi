@@ -121,6 +121,41 @@ local disk.
 There is no database access outside these files, and nothing else in the app requires a session — `/create`
 works fully signed-out.
 
+## Full-song generation (chained segments + ffmpeg stitch)
+
+Runway only generates `RUNWAY_CLIP_DURATION_SECONDS` (10s) per call, so a full-length music video needs multiple
+segments stitched together. `/create` has a "Durée du clip" toggle (`generationMode: "preview" | "full"`):
+
+- **Preview** — the original single-segment flow (`handleSubmit` → `/api/generate` → poll `/api/status`).
+- **Full** — `generateFullSong()` in `app/create/page.tsx` runs a **sequential** loop (not concurrent — each
+  segment depends on the previous one), for `Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS)`
+  segments (`songDurationSeconds` is read from the real uploaded file via `handleSongChange` and the browser's
+  `Audio` element, not guessed):
+  1. `generateSegment()` calls `/api/generate` with `skipHistory: true` (per-segment calls shouldn't each create
+     a history row) and, from the second segment on, `promptImageOverride` set to the *previous segment's last
+     frame* instead of the original character photo — this is what keeps segments visually continuing from each
+     other instead of resetting every 10s. `lib/video-provider.ts`'s `RunwayVideoProvider` gives
+     `promptImageOverride` priority over `character.photoUrls[0]`.
+  2. After each segment, `POST /api/extract-frame` (ffmpeg `-sseof -1`, grabs the last frame, uploads it to Blob
+     as the next segment's starting image).
+  3. Once every segment's video URL is collected, `POST /api/stitch` downloads them all, concatenates with
+     ffmpeg's concat demuxer (`-c copy`, fast — no re-encode, relies on all clips sharing the same Runway
+     model/codec/resolution), muxes the *original uploaded song* over the result as the audio track (`-map 0:v:0
+     -map 1:a:0 -c:v copy -c:a aac -shortest`), uploads the final MP4 to Blob, and — only this final result, not
+     the per-segment clips — gets saved to `generations` history.
+  This is still **not** a seamless single continuous shot: each segment is an independent Runway generation
+  just *seeded* from where the last one visually ended, so subtle jumps in motion/lighting between segments are
+  expected, not a bug to chase.
+- **`app/api/stitch/route.ts`** and **`app/api/extract-frame/route.ts`** both use `ffmpeg-static` (a bundled
+  binary, no system ffmpeg dependency) + `fluent-ffmpeg`, write to a temp dir (`mkdtemp`/`os.tmpdir()`) cleaned
+  up in a `finally`, and set `export const maxDuration = 60` / `30` respectively — conservative limits chosen for
+  Vercel's Hobby plan; longer songs (more segments to download+concat) may need a paid plan's higher function
+  duration cap, or they'll time out mid-stitch.
+- None of this ffmpeg pipeline could be run end-to-end from this sandbox to verify — the final `put()` Blob
+  upload needs the same Vercel network access that's blocked here. What *was* verified locally: the exact
+  concat/mux/frame-extraction ffmpeg command sequences succeed and produce a valid, playable MP4 given real
+  input files (tested with synthetic `testsrc` clips, not real Runway output).
+
 ## Conventions
 
 - All user-facing text (labels, placeholders, errors) is in **French** — match this in any new UI or API

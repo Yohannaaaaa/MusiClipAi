@@ -16,6 +16,10 @@ export interface VideoGenerationInput {
   locations: string[];
   danceStyle: string | null;
   quality: VideoQuality;
+  /** When chaining segments for a full-song video, the last frame of the previous segment — takes
+   * priority over character.photoUrls[0] so each new segment continues from where the last one
+   * visually ended instead of resetting to the original photo. */
+  promptImageOverride?: string;
 }
 
 const QUALITY_LABELS: Record<VideoQuality, string> = {
@@ -100,7 +104,8 @@ class RunwayVideoProvider implements VideoProvider {
   }
 
   async generate(input: VideoGenerationInput): Promise<VideoGenerationResult> {
-    const promptImage = input.character.mode === "photos" ? input.character.photoUrls[0] : undefined;
+    const promptImage =
+      input.promptImageOverride ?? (input.character.mode === "photos" ? input.character.photoUrls[0] : undefined);
     if (!promptImage) {
       return {
         status: "failed",

@@ -50,6 +50,7 @@ type GenerateResponse = {
 };
 
 type Phase = "idle" | "uploading" | "generating";
+type GenerationMode = "preview" | "full";
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 60;
@@ -68,6 +69,8 @@ export default function CreatePage() {
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [themeImages, setThemeImages] = useState<Record<string, string>>({});
   const [songDurationSeconds, setSongDurationSeconds] = useState<number | null>(null);
+  const [generationMode, setGenerationMode] = useState<GenerationMode>("preview");
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
   function handleSongChange(file: File | null) {
     setSongFile(file);
@@ -122,6 +125,15 @@ export default function CreatePage() {
         .filter(Boolean);
       const allLocations = [...new Set([...locations, ...customLocations])];
 
+      if (generationMode === "full") {
+        if (songDurationSeconds === null) {
+          setResult({ error: "Durée de la chanson inconnue. Réessayez d'importer le fichier." });
+          return;
+        }
+        await generateFullSong(songBlob.url, photoUrls, allLocations);
+        return;
+      }
+
       setPhase("generating");
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -156,6 +168,7 @@ export default function CreatePage() {
       setResult({ error: error instanceof Error ? error.message : "Impossible de contacter le serveur. Réessayez." });
     } finally {
       setPhase("idle");
+      setProgress(null);
     }
   }
 
@@ -177,6 +190,112 @@ export default function CreatePage() {
       setResult({ message: data.message });
     }
     setResult({ error: "La génération prend trop de temps. Réessayez plus tard." });
+  }
+
+  async function pollForVideoUrl(jobId: string): Promise<string> {
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+      const response = await fetch(`/api/status?jobId=${encodeURIComponent(jobId)}`);
+      const data: GenerateResponse = await response.json();
+
+      if (!response.ok) throw new Error(data.error ?? `Erreur serveur (HTTP ${response.status}).`);
+      if (data.status === "completed") {
+        if (!data.videoUrl) throw new Error("Segment terminé sans URL de vidéo.");
+        return data.videoUrl;
+      }
+      if (data.status === "failed") throw new Error(data.message ?? "Échec de la génération d'un segment.");
+    }
+    throw new Error("Un segment prend trop de temps à générer.");
+  }
+
+  async function generateSegment(
+    songBlobUrl: string,
+    photoUrls: string[],
+    allLocations: string[],
+    promptImageOverride: string | undefined,
+  ): Promise<string> {
+    if (!songFile) throw new Error("Chanson manquante.");
+
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        songName: songFile.name,
+        songType: songFile.type,
+        songUrl: songBlobUrl,
+        characterMode: characterMode ?? "none",
+        characterDescription,
+        photoUrls,
+        visualDirection,
+        locations: allLocations,
+        danceStyle,
+        quality,
+        skipHistory: true,
+        promptImageOverride,
+      }),
+    });
+
+    const data: GenerateResponse = await response.json();
+    if (!response.ok) throw new Error(data.error ?? `Erreur serveur (HTTP ${response.status}).`);
+    if (data.status === "failed") throw new Error(data.message ?? "Échec de la génération d'un segment.");
+    if (data.status === "completed" && data.videoUrl) return data.videoUrl;
+    if (data.status === "processing" && data.jobId) return pollForVideoUrl(data.jobId);
+    throw new Error("Réponse inattendue du serveur.");
+  }
+
+  async function generateFullSong(songBlobUrl: string, photoUrls: string[], allLocations: string[]) {
+    if (!songFile || songDurationSeconds === null) return;
+
+    const segmentCount = Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS);
+    setPhase("generating");
+
+    const clipUrls: string[] = [];
+    let nextImageUrl: string | undefined;
+
+    for (let index = 0; index < segmentCount; index++) {
+      setProgress({ current: index + 1, total: segmentCount });
+      setResult({ message: `Génération du segment ${index + 1} / ${segmentCount}...` });
+
+      const videoUrl = await generateSegment(songBlobUrl, photoUrls, allLocations, nextImageUrl);
+      clipUrls.push(videoUrl);
+
+      if (index < segmentCount - 1) {
+        setResult({ message: `Préparation de la transition vers le segment ${index + 2} / ${segmentCount}...` });
+        const frameResponse = await fetch("/api/extract-frame", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoUrl }),
+        });
+        const frameData: { imageUrl?: string; error?: string } = await frameResponse.json();
+        if (!frameResponse.ok || !frameData.imageUrl) {
+          throw new Error(frameData.error ?? "Échec de l'extraction de l'image de transition.");
+        }
+        nextImageUrl = frameData.imageUrl;
+      }
+    }
+
+    setResult({ message: `Assemblage final des ${segmentCount} segments...` });
+    const stitchResponse = await fetch("/api/stitch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clipUrls,
+        songUrl: songBlobUrl,
+        songName: songFile.name,
+        locations: allLocations,
+        danceStyle,
+        quality,
+        visualDirection,
+      }),
+    });
+
+    const stitchData: GenerateResponse = await stitchResponse.json();
+    if (!stitchResponse.ok) {
+      setResult({ error: stitchData.error ?? `Erreur serveur (HTTP ${stitchResponse.status}).` });
+    } else {
+      setResult(stitchData);
+    }
   }
 
   const isSubmitting = phase !== "idle";
@@ -239,7 +358,7 @@ export default function CreatePage() {
             />
             <p className="mt-2 text-xs text-zinc-500">
               Le fichier est envoyé directement vers le stockage (Vercel Blob), sans passer par la limite de taille
-              du serveur. La génération elle-même reste simulée pour l&apos;instant.
+              du serveur.
             </p>
           </section>
 
@@ -491,11 +610,47 @@ export default function CreatePage() {
                 <span className="font-medium text-zinc-300">
                   {Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS) * RUNWAY_CREDITS_PER_CLIP} crédits (
                   {(Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS) * RUNWAY_COST_USD_PER_CLIP).toFixed(2)} $)
-                </span>
-                . Pour l&apos;instant, un clic sur « Générer » ne produit qu&apos;un seul clip de{" "}
-                {RUNWAY_CLIP_DURATION_SECONDS} s, pas la chanson entière.
+                </span>{" "}
+                et plusieurs dizaines de minutes (chaque segment prend 1 à 3 min, générés un par un pour rester
+                cohérents visuellement).
               </p>
             )}
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span aria-hidden className="text-fuchsia-500">
+                🔁
+              </span>
+              <h2 className="text-sm font-medium text-white">Durée du clip</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setGenerationMode("preview")}
+                className={`rounded-2xl border bg-zinc-900/60 px-3 py-3 text-center transition-colors ${
+                  generationMode === "preview" ? "border-fuchsia-500" : "border-zinc-700 hover:border-zinc-500"
+                }`}
+              >
+                <span className="block text-sm font-medium text-white">Aperçu</span>
+                <span className="block text-xs text-zinc-500">1 clip de {RUNWAY_CLIP_DURATION_SECONDS} s</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGenerationMode("full")}
+                disabled={songDurationSeconds === null}
+                className={`rounded-2xl border bg-zinc-900/60 px-3 py-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  generationMode === "full" ? "border-fuchsia-500" : "border-zinc-700 hover:border-zinc-500"
+                }`}
+              >
+                <span className="block text-sm font-medium text-white">Chanson complète</span>
+                <span className="block text-xs text-zinc-500">
+                  {songDurationSeconds !== null
+                    ? `${Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS)} clips enchaînés`
+                    : "Importez une chanson d'abord"}
+                </span>
+              </button>
+            </div>
           </section>
 
           <button
@@ -506,8 +661,12 @@ export default function CreatePage() {
             {phase === "uploading"
               ? "Téléversement..."
               : phase === "generating"
-                ? "Génération en cours..."
-                : "Générer mon clip musical →"}
+                ? progress
+                  ? `Segment ${progress.current} / ${progress.total}...`
+                  : "Génération en cours..."
+                : generationMode === "full"
+                  ? "Générer la chanson complète →"
+                  : "Générer un aperçu →"}
           </button>
         </form>
 

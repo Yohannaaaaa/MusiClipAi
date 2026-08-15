@@ -18,6 +18,8 @@ interface GenerateRequestBody {
   locations?: string[];
   danceStyle?: string | null;
   quality?: string;
+  skipHistory?: boolean;
+  promptImageOverride?: string;
 }
 
 export async function POST(request: Request) {
@@ -53,11 +55,12 @@ export async function POST(request: Request) {
       locations,
       danceStyle,
       quality,
+      promptImageOverride: body.promptImageOverride,
     });
 
     try {
       const session = await auth();
-      if (session?.user?.id) {
+      if (session?.user?.id && !body.skipHistory) {
         await db.insert(generations).values({
           userId: session.user.id,
           songName: body.songName,

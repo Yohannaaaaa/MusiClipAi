@@ -48,6 +48,27 @@ Limites à connaître :
 
 Pour connecter un autre service (Pika, Kling, Luma, ...), voir `lib/video-provider.ts` et `CLAUDE.md`.
 
+### Générer la chanson complète (pas juste un aperçu de 10s)
+
+Sur `/create`, le bloc **"Durée du clip"** propose :
+- **Aperçu** — un seul clip de 10s (rapide, ~0,50 $).
+- **Chanson complète** — plusieurs clips de 10s enchaînés (chaque nouveau segment repart de la dernière image du
+  précédent, plutôt que de la photo de départ, pour limiter les coupures visibles) puis assemblés en une seule
+  vidéo avec la vraie chanson en son, via `ffmpeg` (`ffmpeg-static`, aucune installation système requise).
+
+À savoir :
+- Ce n'est **pas** une vidéo parfaitement continue : chaque segment de 10s reste une génération IA indépendante,
+  juste amorcée avec l'image de fin du segment précédent. De légers sauts de mouvement/éclairage entre segments
+  sont normaux.
+- Le temps total est celui de tous les segments **l'un après l'autre** (1 à 3 min chacun) — pour une chanson de
+  3 minutes (~18 segments), comptez facilement 20 à 40 minutes, navigateur ouvert.
+- Le coût est proportionnel au nombre de segments (affiché automatiquement dès qu'une chanson est importée).
+- L'étape finale d'assemblage (`/api/stitch`) a une limite de temps serveur (`maxDuration`, 60s) pensée pour le
+  plan Vercel **Hobby** — une chanson avec beaucoup de segments peut dépasser cette limite au moment de
+  l'assemblage ; passer sur un plan payant Vercel permet une limite plus longue si besoin.
+
+Pour connecter un autre service (Pika, Kling, Luma, ...), voir `lib/video-provider.ts` et `CLAUDE.md`.
+
 ## Photos des cartes "Lieux" et "Style de danse" (Pexels)
 
 Les cartes de la page `/create` affichent une vraie photo (via l'API Pexels) par-dessus le dégradé de secours. Sans clé, ou si Pexels est indisponible, le dégradé + icône reste affiché — aucune casse.
