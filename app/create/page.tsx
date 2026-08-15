@@ -67,6 +67,21 @@ export default function CreatePage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [themeImages, setThemeImages] = useState<Record<string, string>>({});
+  const [songDurationSeconds, setSongDurationSeconds] = useState<number | null>(null);
+
+  function handleSongChange(file: File | null) {
+    setSongFile(file);
+    setSongDurationSeconds(null);
+    if (!file) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    const audio = new Audio(objectUrl);
+    audio.addEventListener("loadedmetadata", () => {
+      if (Number.isFinite(audio.duration)) setSongDurationSeconds(audio.duration);
+      URL.revokeObjectURL(objectUrl);
+    });
+    audio.addEventListener("error", () => URL.revokeObjectURL(objectUrl));
+  }
 
   useEffect(() => {
     fetch("/api/theme-images")
@@ -220,7 +235,7 @@ export default function CreatePage() {
               accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,.mp3,.wav,.m4a"
               className="sr-only"
               required
-              onChange={(event) => setSongFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => handleSongChange(event.target.files?.[0] ?? null)}
             />
             <p className="mt-2 text-xs text-zinc-500">
               Le fichier est envoyé directement vers le stockage (Vercel Blob), sans passer par la limite de taille
@@ -468,6 +483,19 @@ export default function CreatePage() {
               </span>{" "}
               — estimation d&apos;après les tarifs publics de Runway, susceptible de changer.
             </p>
+            {songDurationSeconds !== null && (
+              <p className="mt-1 text-xs text-zinc-500">
+                Pour couvrir toute la chanson ({Math.round(songDurationSeconds)} s) il faudrait{" "}
+                {Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS)} clips de{" "}
+                {RUNWAY_CLIP_DURATION_SECONDS} s, soit environ{" "}
+                <span className="font-medium text-zinc-300">
+                  {Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS) * RUNWAY_CREDITS_PER_CLIP} crédits (
+                  {(Math.ceil(songDurationSeconds / RUNWAY_CLIP_DURATION_SECONDS) * RUNWAY_COST_USD_PER_CLIP).toFixed(2)} $)
+                </span>
+                . Pour l&apos;instant, un clic sur « Générer » ne produit qu&apos;un seul clip de{" "}
+                {RUNWAY_CLIP_DURATION_SECONDS} s, pas la chanson entière.
+              </p>
+            )}
           </section>
 
           <button
